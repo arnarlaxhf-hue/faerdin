@@ -266,127 +266,118 @@
         }
         
         async function loadRealData() {
-            try {
-                updateStatus('Hleður rauntímagögn...');
-                console.log('Fetching real data via Netlify functions...');
-                
-                const [conditionRes, weatherRes] = await Promise.all([
-                    fetch('/.netlify/functions/fetch-faerd'),
-                    fetch('/.netlify/functions/fetch-weather')
-                ]);
-                
-                if (!conditionRes.ok || !weatherRes.ok) {
-                    throw new Error('API response not OK');
-                }
-                
-                const roadConditions = await conditionRes.json();
-                const weatherData = await weatherRes.json();
-                
-                console.log('✓ Real data loaded successfully!');
-                console.log('Road conditions count:', roadConditions.length);
-                console.log('Weather stations count:', weatherData.length);
-                updateStatus('✓ Rauntíma gögn');
-                
-                // Find Hálfdán in road conditions
-                const halfdanCondition = roadConditions.find(c => 
-                    c.StuttNafnButs && c.StuttNafnButs.toLowerCase().includes('hálfdan')
-                );
-                
-                console.log('Hálfdán condition:', halfdanCondition);
-                
-                // Create weather station lookup
-                const weatherStations = {};
-                weatherData.forEach(station => {
-                    weatherStations[station.Nafn] = station;
-                });
-                
-                const locations = [];
-                
-                // Hálfdán
-                if (halfdanCondition) {
-                    const condStatus = getConditionStatus(halfdanCondition.AstandYfirbord);
-                    
-                    // Try to find a weather station near Bíldudalur/Westfjords
-                    // You might need to adjust the station name based on what's available
-                    let weatherStation = weatherData.find(s => 
-                        s.Nafn && (
-                            s.Nafn.toLowerCase().includes('bíldudal') ||
-                            s.Nafn.toLowerCase().includes('patreksfjörður') ||
-                            s.Nafn.toLowerCase().includes('tálknafjörður')
-                        )
-                    );
-                    
-                    // If no specific station found, use any nearby one
-                    if (!weatherStation && weatherData.length > 0) {
-                        weatherStation = weatherData[0]; // Fallback to first station
-                    }
-                    
-                    console.log('Using weather station:', weatherStation ? weatherStation.Nafn : 'None');
-                    
-                    locations.push({
-                        name: 'Hálfdán',
-                        temp: weatherStation ? (weatherStation.T || '--') : '--',
-                        windSpeed: weatherStation ? (weatherStation.F || '--') : '--',
-                        windArrow: weatherStation ? getWindArrow(weatherStation.D) : '○',
-                        roadTemp: weatherStation ? (weatherStation.RTE || '--') : '--',
-                        conditions: [{
-                            icon: condStatus.icon,
-                            text: halfdanCondition.AstandLysing || condStatus.text,
-                            status: condStatus.status
-                        }]
-                    });
-                }
-                
-                // Try to find Miklidalur if it exists
-                const mikladalurCondition = roadConditions.find(c => 
-                    c.StuttNafnButs && c.StuttNafnButs.toLowerCase().includes('miklidalur')
-                );
-                
-                if (mikladalurCondition) {
-                    const condStatus = getConditionStatus(mikladalurCondition.AstandYfirbord);
-                    
-                    let weatherStation = weatherData[0]; // Use first available station
-                    
-                    locations.push({
-                        name: 'Miklidalur',
-                        temp: weatherStation ? (weatherStation.T || '--') : '--',
-                        windSpeed: weatherStation ? (weatherStation.F || '--') : '--',
-                        windArrow: weatherStation ? getWindArrow(weatherStation.D) : '○',
-                        roadTemp: weatherStation ? (weatherStation.RTE || '--') : '--',
-                        conditions: [{
-                            icon: condStatus.icon,
-                            text: mikladalurCondition.AstandLysing || condStatus.text,
-                            status: condStatus.status
-                        }]
-                    });
-                }
-                
-                if (locations.length === 0) {
-                    throw new Error('Engar staðsetningar fundust (Hálfdán/Miklidalur)');
-                }
-                
-                displayData(locations);
-                
-            } catch (error) {
-                console.error('Real data failed:', error);
-                updateStatus('⚠ Villa');
-                
-                document.getElementById('content').innerHTML = `
-                    <div class="loading">
-                        ⚠️ Gat ekki hlaðið gögnum<br>
-                        <span style="font-size: 0.6em; margin-top: 20px; display: block;">
-                            ${error.message}
-                        </span>
-                    </div>
-                `;
-            }
+    try {
+        updateStatus('Hleður rauntímagögn...');
+        console.log('Fetching real data via Netlify functions...');
+        
+        const [conditionRes, weatherRes] = await Promise.all([
+            fetch('/.netlify/functions/fetch-faerd'),
+            fetch('/.netlify/functions/fetch-weather')
+        ]);
+        
+        if (!conditionRes.ok || !weatherRes.ok) {
+            throw new Error('API response not OK');
         }
         
-        updateStatus('Hleður...');
-        updateTime();
-        loadRealData();
-        setInterval(loadRealData, 300000); // Every 5 minutes
-        setInterval(updateTime, 60000); // Every minute
-    </script>
-</body>
-</html>
+        const roadConditions = await conditionRes.json();
+        const weatherData = await weatherRes.json();
+        
+        console.log('✓ Real data loaded successfully!');
+        console.log('Road conditions count:', roadConditions.length);
+        console.log('Weather stations count:', weatherData.length);
+        
+        // DEBUG: Log first 5 weather stations to see what's available
+        console.log('First 5 weather stations:', weatherData.slice(0, 5).map(s => s.Nafn));
+        
+        // DEBUG: Search for Hálfdán in all road conditions
+        const halfdanSearch = roadConditions.filter(c => 
+            c.StuttNafnButs && c.StuttNafnButs.toLowerCase().includes('hálf')
+        );
+        console.log('Roads with "hálf":', halfdanSearch.map(c => c.StuttNafnButs));
+        
+        // DEBUG: Search for Mikli
+        const mikliSearch = roadConditions.filter(c => 
+            c.StuttNafnButs && c.StuttNafnButs.toLowerCase().includes('mikli')
+        );
+        console.log('Roads with "mikli":', mikliSearch.map(c => c.StuttNafnButs));
+        
+        updateStatus('✓ Rauntíma gögn');
+        
+        const locations = [];
+        
+        // Find Hálfdán - search more broadly
+        const halfdanCondition = roadConditions.find(c => 
+            c.FulltNafnButs && c.FulltNafnButs.toLowerCase().includes('hálfdán')
+        ) || roadConditions.find(c => 
+            c.StuttNafnButs && c.StuttNafnButs.toLowerCase().includes('hálfdán')
+        );
+        
+        // Find closest weather station (use any from Westfjords region)
+        // Just use the first available weather station for now
+        const defaultWeather = weatherData[0] || {};
+        
+        if (halfdanCondition) {
+            const condStatus = getConditionStatus(halfdanCondition.AstandYfirbord);
+            console.log('Found Hálfdán:', halfdanCondition.FulltNafnButs);
+            
+            locations.push({
+                name: 'Hálfdán',
+                temp: defaultWeather.T || '--',
+                windSpeed: defaultWeather.F || '--',
+                windArrow: getWindArrow(defaultWeather.D),
+                roadTemp: defaultWeather.RTE || '--',
+                conditions: [{
+                    icon: condStatus.icon,
+                    text: halfdanCondition.AstandLysing || condStatus.text,
+                    status: condStatus.status
+                }]
+            });
+        } else {
+            console.warn('Hálfdán not found in road conditions');
+        }
+        
+        // Find Miklidalur
+        const mikladalurCondition = roadConditions.find(c => 
+            c.FulltNafnButs && c.FulltNafnButs.toLowerCase().includes('miklidalur')
+        ) || roadConditions.find(c => 
+            c.StuttNafnButs && c.StuttNafnButs.toLowerCase().includes('miklidalur')
+        );
+        
+        if (mikladalurCondition) {
+            const condStatus = getConditionStatus(mikladalurCondition.AstandYfirbord);
+            console.log('Found Miklidalur:', mikladalurCondition.FulltNafnButs);
+            
+            locations.push({
+                name: 'Miklidalur',
+                temp: defaultWeather.T || '--',
+                windSpeed: defaultWeather.F || '--',
+                windArrow: getWindArrow(defaultWeather.D),
+                roadTemp: defaultWeather.RTE || '--',
+                conditions: [{
+                    icon: condStatus.icon,
+                    text: mikladalurCondition.AstandLysing || condStatus.text,
+                    status: condStatus.status
+                }]
+            });
+        }
+        
+        if (locations.length === 0) {
+            throw new Error('Engar staðsetningar fundust (Hálfdán/Miklidalur)');
+        }
+        
+        displayData(locations);
+        
+    } catch (error) {
+        console.error('Real data failed:', error);
+        updateStatus('⚠ Villa');
+        
+        document.getElementById('content').innerHTML = `
+            <div class="loading">
+                ⚠️ Gat ekki hlaðið gögnum<br>
+                <span style="font-size: 0.6em; margin-top: 20px; display: block;">
+                    ${error.message}
+                </span>
+            </div>
+        `;
+    }
+}
