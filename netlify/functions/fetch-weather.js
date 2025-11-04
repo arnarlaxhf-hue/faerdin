@@ -1,4 +1,3 @@
-const https = require('https');
 const http = require('http');
 
 exports.handler = async function(event, context) {
@@ -28,3 +27,4 @@ exports.handler = async function(event, context) {
     });
   });
 };
+
